@@ -1,0 +1,74 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Diário de Classe</title>
+<style>body{font:14px system-ui;max-width:920px;margin:20px auto;padding:0 12px}h2{margin:22px 0 6px;border-bottom:1px solid #ccc}
+input,textarea,select{font:inherit;padding:3px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:2px 6px}
+button{font:inherit;padding:5px 12px;cursor:pointer}label{margin-right:14px}.g{color:#555}.row{display:grid;grid-template-columns:360px 1fr;gap:28px;align-items:start}.row textarea{width:100%;box-sizing:border-box}.row p{margin-top:0}.col{display:flex;flex-direction:column;gap:8px}.r{color:#b00}
+.nt{table-layout:fixed;width:100%}.nt input{width:100%;box-sizing:border-box}.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style>
+<body><div style="display:flex;align-items:center;gap:14px"><img src="https://www.udc.edu.br/libwww/udc/uploads/uploadsUnidade/20082026163316logoudc.jpg" alt="UDC" style="height:56px" onerror="this.style.display='none'"><h1>Diário de Classe</h1></div><div id="ini"></div><div id="app"></div>
+<script src="lib/pdf-lib.min.js"></script><script src="motor.js"></script>
+<script>
+let S,I,D,dk,sel,nb=1;const $=id=>document.getElementById(id),DIAS=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+const hoje=new Date().toLocaleDateString('sv'),br=i=>i.split('-').reverse().join('/'),num=v=>{v=parseFloat(String(v).replace(',','.'));return isNaN(v)?null:v};
+const up=x=>Math.ceil(Math.round(x*2*1e6)/1e6)/2,fm=v=>v==null?'':v.toFixed(1).replace('.',','),esc=v=>String(v).replace(/"/g,'&quot;');
+const ord=()=>Object.keys(I).sort((a,b)=>I[a].nome.localeCompare(I[b].nome,'pt')||I[a].sem.localeCompare(I[b].sem)),cur=()=>S.disc[dk],rec=(k,d)=>{const a=S.disc[k].aulas[d];return !!a&&Object.keys(a.falt).length>0},pend=k=>D[k].filter(x=>x.d<=hoje&&!rec(k,x.d)).length;
+const aula=()=>cur().aulas[sel]=cur().aulas[sel]||{falt:{},conteudo:""};
+async function save(re){D=(await(await fetch('/api/state',{method:'POST',body:JSON.stringify(S)})).json()).datas;if(re)render()}
+function ensure(){if(!sel)return;const a=aula();for(const t in I[dk].turmas)a.falt[t]=a.falt[t]||[]}
+function ultima(k){const l=D[k]||[];return(l.filter(x=>x.d<=hoje).pop()||l[0]||{}).d}
+function inicial(){for(const k of ord())if(D[k].some(x=>x.d==hoje&&!rec(k,x.d)))return[k,hoje];let b=null;
+ for(const k of ord())for(const x of D[k])if(x.d<=hoje&&!rec(k,x.d)&&(!b||x.d>b[1]))b=[k,x.d];if(b)return b;const k=ord()[0];return[k,ultima(k)]}
+async function load(){const r=await(await fetch('/api/state')).json();S=r.S;I=r.info;D=r.datas;
+ if(Object.keys(I).length){if(!dk||!S.disc[dk])[dk,sel]=inicial();ensure();await save()}render()}
+function cfg(k,v){cur()[k]=v;save(true)}
+function trocar(k){dk=k;sel=ultima(k);ensure();save(true)}
+function falt(t,ra,on){ensure();const a=aula();a.falt[t]=a.falt[t].filter(x=>x!=ra);if(on)a.falt[t].push(ra);save()}
+function limpar(){aula().falt={};save(true)}
+function nsem(v){const c=cur().ciclo;v=+v;while(c.length<v)c.push([]);c.length=v;save(true)}
+const ed=(i,j,k,v)=>{cur().ciclo[i][j][k]=+v;save(true)},rm=(i,j)=>{cur().ciclo[i].splice(j,1);save(true)},add=i=>{cur().ciclo[i].push({dia:1,n:2});save(true)};
+function calc(c,t,ra){const m=((c.notas[t]||{})[ra])||{};
+ const mb=b=>{let s=0,p=0;for(const k of c.comp[b]){const v=num((m[b]||{})[k.id]);if(v==null)return null;s+=v*k.peso;p+=+k.peso}return p?up(s/p):null};
+ const m1=mb(1),m2=mb(2);let fin=null,prec=false;
+ if(m1!=null&&m2!=null){const x=up((m1+m2)/2);if(x>=4&&x<7){prec=true;const e=num(m.ex);if(e!=null)fin=up((x+e)/2)}else fin=x}
+ return{m1,m2,fin,prec,ex:m.ex}}
+function upd(t,ra){const r=calc(cur(),t,ra),k=t+ra;$('a'+k).textContent=fm(nb==1?r.m1:r.m2);if($('b'+k)){$('b'+k).textContent=fm(r.m1);$('d'+k).textContent=fm(r.fin);$('e'+k).disabled=!r.prec}}
+function mm(t,ra){const n=cur().notas;return((n[t]=n[t]||{})[ra]=n[t][ra]||{})}
+function nt(t,ra,b,id,v){const m=mm(t,ra);(m[b]=m[b]||{})[id]=v;save();upd(t,ra)}
+function nex(t,ra,v){mm(t,ra).ex=v;save();upd(t,ra)}
+const nid=()=>'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const cn=(b,i,k,v)=>{cur().comp[b][i][k]=k=='peso'?(num(v)||0):v;save(true)},crm=(b,i)=>{cur().comp[b].splice(i,1);save(true)},cadd=b=>{cur().comp[b].push({id:nid(),nome:cur().comp[b].some(k=>k.nome=='Trabalho')?'Nova nota':'Trabalho',peso:0});save(true)};
+async function gerar(todas){$('msg').textContent='Gerando...';const r=await(await fetch('/api/gerar',{method:'POST',body:JSON.stringify({d:todas?null:dk})})).json();$('msg').textContent=r.erro?'Erro: '+r.erro:'Pronto! Na pasta "PDFs gerados" (dentro da pasta escolhida): '+r.ok.join(', ')}
+function render(){if(!dk){$('app').innerHTML='<p class=r>Nenhum diário em PDF encontrado na pasta escolhida.</p>';return}
+const c=cur(),d=I[dk],a=c.aulas[sel]||{falt:{},conteudo:""},ds=D[dk];
+let h=`<h2>Semestre e Feriados</h2><div class=row><div class=col><label>Início do semestre <input type=date value="${S.inicio}" onchange="S.inicio=this.value;save(true)"></label><label>Final do semestre <input type=date value="${S.fim}" onchange="S.fim=this.value;save(true)"></label></div><div>Feriados e dias sem aula:<br><textarea rows=2 cols=50 onchange="S.feriados=this.value;save(true)">${S.feriados}</textarea><div class=g>dd/mm/aaaa, separados por espaço ou vírgula</div></div></div>
+<h2>Disciplina</h2><select onchange="trocar(this.value)">${ord().map(k=>{const p=pend(k),t=D[k].some(x=>x.d==hoje);return`<option value="${k}" ${k==dk?'selected':''}>${I[k].nome} (${I[k].sem})${t?' • aula hoje':''}${p?' • '+p+' sem presença':''}</option>`}).join('')}</select>
+<span class=g> Turmas: ${Object.keys(d.turmas).join(', ')}</span>${Object.entries(d.turmas).filter(x=>x[1].dup).map(x=>`<div class=g>Turma ${x[0]}: havia PDFs repetidos; usando o mais recente (${x[1].f}).</div>`).join('')}<br><br>
+<div class=row><div><label>Avaliação do 1º bim. <input type=date value="${c.aval1}" onchange="cfg('aval1',this.value)"></label></div><div><b>Padrão de aulas</b> — semanas no ciclo: <select onchange="nsem(this.value)">${[1,2,3,4].map(n=>`<option ${n==c.ciclo.length?'selected':''}>${n}</option>`).join('')}</select><br>`+
+c.ciclo.map((w,i)=>`<div style="margin:6px 0 10px"><b>Semana ${i+1}:</b>`+w.map((e,j)=>`<div style="margin:3px 0"><select style="width:110px" onchange="ed(${i},${j},'dia',this.value)">${DIAS.map((n,q)=>`<option value=${q} ${q==e.dia?'selected':''}>${n}</option>`).join('')}</select> <select style="width:52px" onchange="ed(${i},${j},'n',this.value)">${[1,2,3,4,5,6].map(q=>`<option ${q==e.n?'selected':''}>${q}</option>`).join('')}</select> aulas <button onclick="rm(${i},${j})">✕</button></div>`).join('')+`<button onclick="add(${i})">+ dia</button></div>`).join('')+'</div></div>';
+h+='<div class=row>'+[1,2].map(b=>{const l=c.comp[b],s=l.reduce((a,k)=>a+(+k.peso||0),0);return`<p><b>Composição da nota — ${b}º bim.</b><br>`+l.map((k,i)=>`<input value="${esc(k.nome)}" onchange="cn(${b},${i},'nome',this.value)"> <input style="width:50px" value="${k.peso}" onchange="cn(${b},${i},'peso',this.value)">% <button onclick="crm(${b},${i})">✕</button><br>`).join('')+`<button onclick="cadd(${b})">+ componente</button> <span class="${s==100?'g':'r'}">soma: ${s}%${s==100?'':' (deveria ser 100%)'}</span></p>`}).join('')+'</div>';
+h+=`<div class=g>${ds.length} dias de aula: `+[1,2].map(b=>{const n=ds.filter(x=>x.bim==b).reduce((s,x)=>s+x.n,0);return`<span class="${n>42?'r':''}">${b}º bim. ${n} aulas${n>42?' (máx. 42 colunas no PDF!)':''}</span>`}).join(' · ')+'</div>';
+h+=`<h2>Aula do dia</h2><div class=row><div><select onchange="sel=this.value;ensure();save(true)">${ds.map(x=>`<option value="${x.d}" ${x.d==sel?'selected':''}>${rec(dk,x.d)?'✓ ':''}${br(x.d)} • ${x.n} aulas (${x.bim}º bim.)</option>`).join('')}</select></div>`;
+h+=sel?`<div>Conteúdo (vale para todas as turmas):<br><textarea rows=2 cols=70 onchange="aula().conteudo=this.value;save()">${a.conteudo||''}</textarea></div></div>`:'</div>';if(sel){
+const al=[];for(const t in d.turmas)for(const x of d.turmas[t].al)al.push({t,ra:x.ra,nome:x.nome});al.sort((p,q)=>p.nome.localeCompare(q.nome,'pt'));
+h+='<p><b>Marque quem faltou</b> (✓ na data = presença já lançada) <button onclick="limpar()">Desfazer lançamento desta data</button></p>'+al.map(x=>`<label style="display:block"><input type=checkbox ${(a.falt[x.t]||[]).includes(x.ra)?'checked':''} onchange="falt('${x.t}','${x.ra}',this.checked)"> ${x.nome} <span class=g>(${x.t})</span></label>`).join('')}
+h+=`<h2>Notas</h2><label><input type=radio name=nb ${nb==1?'checked':''} onchange="nb=1;render()"> 1º bim.</label><label><input type=radio name=nb ${nb==2?'checked':''} onchange="nb=2;render()"> 2º bim.</label><p></p>`;const cp=c.comp[nb];
+for(const t in d.turmas){h+=`<b>${t}</b><table class=nt><colgroup><col width=40><col>${'<col width=95>'.repeat(cp.length+1+(nb==2?3:0))}</colgroup><tr><th>Nº<th>Aluno${cp.map(k=>`<th>${k.nome} (${k.peso}%)`).join('')}<th>Média ${nb}º bim${nb==2?'<th>Média 1º bim<th>Exame<th>FINAL':''}</tr>`+d.turmas[t].al.map(x=>{const m=((c.notas[t]||{})[x.ra])||{},r=calc(c,t,x.ra),k=t+x.ra;
+return`<tr><td>${x.n}<td class=nm>${x.nome}`+cp.map(q=>`<td><input value="${esc(((m[nb]||{})[q.id])??'')}" onchange="nt('${t}','${x.ra}',${nb},'${q.id}',this.value)">`).join('')+`<td id="a${k}">${fm(nb==1?r.m1:r.m2)}`+(nb==2?`<td id="b${k}">${fm(r.m1)}<td><input id="e${k}" value="${esc(m.ex??'')}" ${r.prec?'':'disabled'} onchange="nex('${t}','${x.ra}',this.value)"><td id="d${k}">${fm(r.fin)}`:'')+'</tr>'}).join('')+'</table><br>'}
+h+='<h2>PDFs</h2><button onclick="gerar(false)">Gerar PDFs desta disciplina</button> <button onclick="gerar(true)">Gerar de todas as disciplinas</button> <span id=msg></span>';$('app').innerHTML=h}
+const G={dir:null,out:null,files:[],info:{},S:null,timer:null},jr=o=>({json:async()=>o});
+const idb=(m,v)=>new Promise((ok,no)=>{const q=indexedDB.open('diario',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onerror=()=>no(q.error);q.onsuccess=()=>{const s=q.result.transaction('k',m=='get'?'readonly':'readwrite').objectStore('k'),r=m=='get'?s.get('dir'):s.put(v,'dir');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}});
+const wr=async(h,n,d)=>{const w=await(await h.getFileHandle(n,{create:true})).createWritable();await w.write(d);await w.close()};
+function gravar(){clearTimeout(G.timer);G.timer=setTimeout(()=>wr(G.out,'progresso.json',JSON.stringify(G.S,null,1)).catch(e=>$('msg')&&($('msg').textContent='Erro ao salvar: '+e.message)),300)}
+window.fetch=async(u,o={})=>{const b=o.body?JSON.parse(o.body):null;
+ if(u=='/api/state'){if(b){G.S=b;gravar();return jr({datas:Motor.alld(G.S)})}return jr({S:G.S,info:G.info,datas:Motor.alld(G.S)})}
+ try{const r=await Motor.gerar(G.files,G.S,G.info,b.d);for(const x of r)await wr(G.out,x.name,x.bytes);return jr({ok:r.map(x=>x.name)})}catch(e){return jr({erro:e.message})}};
+async function lerPasta(){G.files=[];for await(const[n,h]of G.dir.entries())if(h.kind=='file'&&n.toLowerCase().endsWith('.pdf')){const f=await h.getFile();G.files.push({name:n,bytes:new Uint8Array(await f.arrayBuffer()),m:f.lastModified})}
+ G.info=await Motor.scan(G.files);G.out=await G.dir.getDirectoryHandle('PDFs gerados',{create:true});
+ try{G.S=JSON.parse(await(await(await G.out.getFileHandle('progresso.json')).getFile()).text())}catch{G.S=null}G.S=Motor.loadS(G.S,G.info)}
+async function abrir(h){try{if(await h.requestPermission({mode:'readwrite'})!='granted')return;G.dir=h;await PDFJS_READY;$('ini').innerHTML='<p>Carregando os diários...</p>';await lerPasta();await idb('set',h);
+ $('ini').innerHTML=`<p class=g>Pasta: <b>${h.name}</b> · ${G.files.length} PDF(s) · <button onclick="inicio()">Trocar pasta</button> <button onclick="abrir(G.dir)">Recarregar PDFs</button></p>`;await load()}catch(e){inicio('Não foi possível abrir: '+e.message)}}
+async function escolher(){let h;try{h=await showDirectoryPicker({id:'diarios',mode:'readwrite'})}catch(e){if(e.name!='AbortError')inicio(e.name=='SecurityError'?'O Chrome não permite escolher essa pasta diretamente (ex.: Documentos, Downloads ou Mesa). Crie uma subpasta, como "Diários", coloque os PDFs nela e escolha essa subpasta.':'Não foi possível abrir a janela de escolha: '+e.message);return}await abrir(h)}
+async function inicio(erro){$('app').innerHTML='';if(location.protocol=='file:'){$('ini').innerHTML='<p class=r>Esta página não pode ser aberta direto do arquivo. Abra pelo endereço web (por exemplo http://localhost:8000).</p>';return}if(!window.showDirectoryPicker){$('ini').innerHTML='<p class=r>Abra esta página no Google Chrome ou no Microsoft Edge (o Safari e o Firefox não funcionam).</p>';return}
+ let h=null;try{h=await idb('get')}catch{}
+ $('ini').innerHTML=(erro?`<p class=r>${erro}</p>`:'')+'<p>Escolha a pasta onde estão os PDFs dos diários. A pasta "PDFs gerados" será criada dentro dela.</p><button onclick="escolher()">Carregar pasta dos diários</button> '+(h?`<button onclick="idb('get').then(abrir)">Continuar com a pasta anterior (${h.name})</button>`:'')}
+FONTURL='lib/standard_fonts/';PDFJS_READY=import('./lib/pdf.min.mjs').then(m=>{m.GlobalWorkerOptions.workerSrc='lib/pdf.worker.min.mjs';window.PDFJS=m});
+inicio();
+</script>
