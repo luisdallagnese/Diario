@@ -26,6 +26,7 @@ function unir(info,S){const u=S.uni||{},root=k=>{let n=0;while(u[k]&&info[u[k]]&
 const alld=S=>{const f=feriados(S.feriados),o={};for(const k in S.disc)o[k]=datas(S.disc[k],f,S.inicio,S.fim);return o};
 function mediaBim(comp,vals){let s=0,p=0;for(const k of comp){const v=num((vals||{})[k.id]);if(v==null)return null;s+=v*k.peso;p+=+k.peso}return p?up(s/p):null}
 function final(m1,m2,ex){if(m1==null||m2==null)return[null,false];const x=up((m1+m2)/2);return x>=4&&x<7?[ex!=null?up((x+ex)/2):null,true]:[x,false]}
+function cont(cf,ds,iso){const c=(cf.aulas[iso]||{}).conteudo;if(c)return c;if(ds.length&&ds[0].d==iso)return'Apresentação da Disciplina';if(cf.aval1==iso)return'Avaliação Bimestral';return''}
 async function pdf(d,cf,ds,turma,t,bytes){const doc=await PDFLib.PDFDocument.load(bytes),pgs=doc.getPages(),H=pgs[0].getHeight(),F=await doc.embedFont(PDFLib.StandardFonts.Helvetica),FB=await doc.embedFont(PDFLib.StandardFonts.HelveticaBold),notas=cf.notas[turma]||{};let pg;
  const san=(s,f)=>[...String(s).replace(/\s+/g,' ')].map(ch=>{try{f.encodeText(ch);return ch}catch{return'?'}}).join('');
  const txt=(xa,xb,ta,tb,s,sz=7,left=false,bold=false)=>{const f=bold?FB:F;s=san(s,f);while(f.widthOfTextAtSize(s,sz)>xb-xa-2&&sz>3)sz-=.3;const y=H-(ta+tb)/2-sz*.35;
@@ -41,10 +42,10 @@ async function pdf(d,cf,ds,turma,t,bytes){const doc=await PDFLib.PDFDocument.loa
    if(bim==1&&m1!=null)txt(785.2,807.9,ta,tb,fmt(m1));
    if(bim==2){if(m2!=null)txt(728.5,754,ta,tb,fmt(m2));if(prec&&ex!=null)txt(754,779.5,ta,tb,fmt(ex));if(fin!=null)txt(779.5,807.9,ta,tb,fmt(fin))}}}
  for(const bim of[1,2]){pg=pgs[bim+1];let i=0;ds.forEach((x,k)=>{if(x.bim!=bim)return;const n=i++;if(n>=42)return;const cx=n<21?[28.4,85,107.7,411]:[411,467.7,496.1,807.9],ta=121.9+14.17*(n%21),tb=ta+14.17;
-  txt(cx[0],cx[1],ta,tb,dd(x.d),7.5);txt(cx[1],cx[2],ta,tb,String(k+1),7.5);txt(cx[2],cx[3],ta,tb,(cf.aulas[x.d]||{}).conteudo||'',7.5,true)})}
+  txt(cx[0],cx[1],ta,tb,dd(x.d),7.5);txt(cx[1],cx[2],ta,tb,String(k+1),7.5);txt(cx[2],cx[3],ta,tb,cont(cf,ds,x.d),7.5,true)})}
  return doc.save()}
 async function gerar(files,S,info,dk){const D=alld(S),out=[];
  for(const k in info){if(dk&&k!=dk)continue;for(const turma in info[k].turmas){const t=info[k].turmas[turma],o=files.find(f=>f.name==t.f);
   out.push({name:`${t.nome||info[k].nome} - ${turma}.pdf`.replace(/[\/\\:*?"<>|]/g,'-'),bytes:await pdf(info[k],S.disc[k],D[k],turma,t,o.bytes)})}}return out}
-globalThis.Motor={v:5,unir,scan,loadS,alld,gerar};
+globalThis.Motor={v:6,cont,unir,scan,loadS,alld,gerar};
 })();
